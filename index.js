@@ -11,7 +11,6 @@ module.exports = class SimpleLND {
     const uri = opts.lndconnect || opts.lndconnectUri
 
     if (uri) opts = { ...decodeLNConnect(uri), ...opts }
-      console.log(opts)
     if (!opts.macaroon) throw new Error('macaroon is required')
 
     this.macaroon = autoBuffer(opts.macaroon).toString('hex')
