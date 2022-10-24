@@ -17,7 +17,7 @@ module.exports = class SimpleLND {
     this.macaroon = autoBuffer(opts.macaroon)
     this.cert = opts.cert ? autoBuffer(opts.cert) : null
 
-    let host = opts.host || '127.0.0.1'
+    let host = (opts.host || '127.0.0.1').trim()
     let port = opts.port || 0
 
     const i = host.indexOf(':')
@@ -184,6 +184,7 @@ module.exports = class SimpleLND {
 
 function autoBuffer (inp) {
   if (Buffer.isBuffer(inp)) return inp
+  inp = inp.trim()
   if (/^[a-fA-F0-9]+$/.test(inp)) return Buffer.from(inp, 'hex')
   return Buffer.from(inp, 'base64')
 }
