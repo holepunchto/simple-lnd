@@ -34,7 +34,7 @@ module.exports = class SimpleLND {
       : (this.host !== '127.0.0.1' && this.host !== 'localhost')
 
     this.headers = {
-      'Connection': 'Keep-Alive',
+      Connection: 'Keep-Alive',
       'Grpc-Metadata-macaroon': this.macaroon.toString('hex')
     }
 

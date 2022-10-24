@@ -3,8 +3,14 @@
   "version": "0.0.0",
   "description": "Simple LND REST client",
   "main": "index.js",
+  "scripts": {
+    "test": "standard"
+  },
   "dependencies": {
     "newline-decoder": "^1.0.0"
+  },
+  "devDependencies": {
+    "standard": "^17.0.0"
   },
   "repository": {
     "type": "git",
