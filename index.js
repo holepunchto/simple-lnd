@@ -17,7 +17,7 @@ module.exports = class SimpleLND {
     this.macaroon = autoBuffer(opts.macaroon)
     this.cert = opts.cert ? autoBuffer(opts.cert) : null
 
-    let host = (opts.host || '127.0.0.1').trim()
+    let host = (opts.host || opts.socket || '127.0.0.1').trim()
     let port = opts.port || 0
 
     const i = host.indexOf(':')
