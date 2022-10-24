@@ -13,7 +13,8 @@ module.exports = class SimpleLND {
     if (uri) opts = { ...decodeLNConnect(uri), ...opts }
     if (!opts.macaroon) throw new Error('macaroon is required')
 
-    this.macaroon = autoBuffer(opts.macaroon).toString('hex')
+    this.destroyed = false
+    this.macaroon = autoBuffer(opts.macaroon)
     this.cert = opts.cert ? autoBuffer(opts.cert) : null
 
     let host = opts.host || '127.0.0.1'
@@ -31,6 +32,11 @@ module.exports = class SimpleLND {
     this.rejectUnauthorized = typeof opts.rejectUnauthorized === 'boolean'
       ? opts.rejectUnauthorized
       : (this.host !== '127.0.0.1' && this.host !== 'localhost')
+
+    this.headers = {
+      'Connection': 'Keep-Alive',
+      'Grpc-Metadata-macaroon': this.macaroon.toString('hex')
+    }
 
     this.requests = new Set()
 
@@ -79,11 +85,22 @@ module.exports = class SimpleLND {
   }
 
   subscribeInvoices ({ addIndex = 0, settleIndex = 0 } = {}) {
-    return this._request({ method: 'GET', path: '/v1/invoices/subscribe?add_index=' + addIndex + '&settle_index=' + settleIndex }, { heartbeat: true })
+    return this._request({ method: 'GET', path: '/v1/invoices/subscribe?add_index=' + addIndex + '&settle_index=' + settleIndex, heartbeat: true })
   }
 
   destroy () {
+    this.destroyed = true
     for (const req of this.requests) req.destroy()
+  }
+
+  session () {
+    return new SimpleLND({
+      host: this.host,
+      port: this.port,
+      macaroon: this.macaroon,
+      cert: this.cert,
+      rejectUnauthorized: this.rejectUnauthorized
+    })
   }
 
   async _autoConf () {
@@ -126,17 +143,14 @@ module.exports = class SimpleLND {
       host: this.host,
       port: this.port,
       rejectUnauthorized: this.rejectUnauthorized,
-      headers: {
-        'Connection': 'Keep-Alive',
-        'Grpc-Metadata-macaroon': this.macaroon
-      }
+      headers: this.headers
     })
 
     this.requests.add(req)
 
     let interval = null
     if (opts.heartbeat) {
-      interval = setInterval(() => res.socket.write(EMPTY), 10000)
+      interval = setInterval(() => req.socket.write(EMPTY), 10000)
     } else {
       req.setTimeout(30000, () => req.destroy())
     }
@@ -170,7 +184,7 @@ module.exports = class SimpleLND {
 
 function autoBuffer (inp) {
   if (Buffer.isBuffer(inp)) return inp
-  if (/^[a-fA-F0-9]$/.test(inp)) return Buffer.from(inp, 'hex')
+  if (/^[a-fA-F0-9]+$/.test(inp)) return Buffer.from(inp, 'hex')
   return Buffer.from(inp, 'base64')
 }
 
