@@ -1,0 +1,19 @@
+{
+  "name": "simple-lnd",
+  "version": "0.0.0",
+  "description": "Simple LND REST client",
+  "main": "index.js",
+  "dependencies": {
+    "newline-decoder": "^1.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/holepunchto/simple-lnd.git"
+  },
+  "author": "Mathias Buus (@mafintosh)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/holepunchto/simple-lnd/issues"
+  },
+  "homepage": "https://github.com/holepunchto/simple-lnd"
+}
