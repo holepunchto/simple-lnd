@@ -1,8 +1,8 @@
 const https = require('https')
 const { URL } = require('url')
 const NewlineDecoder = require('newline-decoder')
-
-const EMPTY = Buffer.alloc(0)
+const WebSocket = require('ws')
+const FastFifo = require('fast-fifo')
 
 module.exports = class SimpleLND {
   constructor (opts = {}) {
@@ -85,7 +85,7 @@ module.exports = class SimpleLND {
   }
 
   subscribeInvoices ({ addIndex = 0, settleIndex = 0 } = {}) {
-    return this._request({ method: 'GET', path: '/v1/invoices/subscribe?add_index=' + addIndex + '&settle_index=' + settleIndex, heartbeat: true })
+    return this._requestLiveStream({ path: '/v1/invoices/subscribe?add_index=' + addIndex + '&settle_index=' + settleIndex })
   }
 
   destroy () {
@@ -129,6 +129,99 @@ module.exports = class SimpleLND {
     return result
   }
 
+  async * _requestLiveStream (opts) {
+    if (opts.autoConf !== false) {
+      if (!this._configuring) this._configuring = this._autoConf()
+      await this._configuring
+    }
+
+    const sock = new WebSocket('wss://' + this.host + ':' + this.port + opts.path, {
+      timeout: 10000,
+      ca: this.cert && [this.cert],
+      host: this.host,
+      port: this.port,
+      rejectUnauthorized: this.rejectUnauthorized,
+      headers: {
+        'Grpc-Metadata-macaroon': this.headers['Grpc-Metadata-macaroon']
+      }
+    })
+
+    const queue = new FastFifo()
+
+    let yieldResolve = null
+    let yieldReject = null
+    let error = null
+    let pongs = 0
+    let pings = 0
+    let interval = null
+
+    sock.on('open', function () {
+      interval = setInterval(ping, 7000)
+    })
+
+    sock.on('pong', function () {
+      pongs++
+    })
+
+    sock.on('message', function (m) {
+      queue.push(m)
+      drain()
+    })
+
+    sock.on('error', function (err) {
+      clearInterval(interval)
+      error = err
+      drain()
+    })
+
+    sock.on('close', function () {
+      clearInterval(interval)
+      if (!error) error = new Error('Closed')
+      drain()
+    })
+
+    while (true) {
+      yield new Promise((resolve, reject) => {
+        yieldResolve = resolve
+        yieldReject = reject
+        drain()
+      })
+    }
+
+    function ping () {
+      if (pings++ !== pongs) sock.terminate()
+      else sock.ping()
+    }
+
+    function drain () {
+      if (!yieldResolve) return
+
+      if (error) {
+        trigger(error, null)
+        return
+      }
+
+      const next = queue.shift()
+      if (!next) return
+
+      let m = null
+      try {
+        m = JSON.parse(next)
+      } catch (err) {
+        trigger(err, null)
+        return
+      }
+
+      trigger(null, m)
+    }
+
+    function trigger (err, val) {
+      if (err) yieldReject(err)
+      else yieldResolve(val)
+      yieldReject = yieldResolve = null
+    }
+  }
+
   async * _request (opts) {
     if (opts.autoConf !== false) {
       if (!this._configuring) this._configuring = this._autoConf()
@@ -143,17 +236,12 @@ module.exports = class SimpleLND {
       host: this.host,
       port: this.port,
       rejectUnauthorized: this.rejectUnauthorized,
-      headers: this.headers
+      headers: this.headers,
+      noDelay: true
     })
 
     this.requests.add(req)
-
-    let interval = null
-    if (opts.heartbeat) {
-      interval = setInterval(() => req.socket.write(EMPTY), 10000)
-    } else {
-      req.setTimeout(30000, () => req.destroy())
-    }
+    req.setTimeout(30000, () => req.destroy())
 
     if (opts.body) req.end(JSON.stringify(opts.body))
     else req.end()
@@ -176,7 +264,6 @@ module.exports = class SimpleLND {
         yield JSON.parse(line)
       }
     } finally {
-      if (interval) clearInterval(interval)
       this.requests.delete(req)
     }
   }

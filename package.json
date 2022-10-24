@@ -7,7 +7,9 @@
     "test": "standard"
   },
   "dependencies": {
-    "newline-decoder": "^1.0.0"
+    "fast-fifo": "^1.1.0",
+    "newline-decoder": "^1.0.0",
+    "ws": "^8.10.0"
   },
   "devDependencies": {
     "standard": "^17.0.0"
