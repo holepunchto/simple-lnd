@@ -39,6 +39,7 @@ module.exports = class SimpleLND {
     }
 
     this.requests = new Set()
+    this.webSockets = new Set()
 
     this._configuring = null
   }
@@ -91,6 +92,7 @@ module.exports = class SimpleLND {
   destroy () {
     this.destroyed = true
     for (const req of this.requests) req.destroy()
+    for (const sock of this.webSockets) sock.terminate()
   }
 
   session () {
@@ -155,37 +157,47 @@ module.exports = class SimpleLND {
     let pings = 0
     let interval = null
 
-    sock.on('open', function () {
+    sock.on('open', onopen)
+    sock.on('pong', onpong)
+    sock.on('message', onmessage)
+    sock.on('error', onerror)
+    sock.on('close', onclose)
+
+    this.webSockets.add(sock)
+
+    try {
+      while (true) {
+        yield new Promise((resolve, reject) => {
+          yieldResolve = resolve
+          yieldReject = reject
+          drain()
+        })
+      }
+    } finally {
+      this.webSockets.delete(sock)
+    }
+
+    function onopen () {
       interval = setInterval(ping, 7000)
-    })
+    }
 
-    sock.on('pong', function () {
+    function onpong () {
       pongs++
-    })
+    }
 
-    sock.on('message', function (m) {
+    function onmessage (m) {
       queue.push(m)
       drain()
-    })
+    }
 
-    sock.on('error', function (err) {
+    function onerror (err) {
       clearInterval(interval)
       error = err
       drain()
-    })
+    }
 
-    sock.on('close', function () {
-      clearInterval(interval)
-      if (!error) error = new Error('Closed')
-      drain()
-    })
-
-    while (true) {
-      yield new Promise((resolve, reject) => {
-        yieldResolve = resolve
-        yieldReject = reject
-        drain()
-      })
+    function onclose () {
+      onerror(error || new Error('Closed'))
     }
 
     function ping () {
