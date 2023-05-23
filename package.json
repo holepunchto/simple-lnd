@@ -1,5 +1,5 @@
 {
-  "name": "simple-lnd",
+  "name": "@holepunchto/simple-lnd",
   "version": "1.0.1",
   "description": "Simple LND REST client",
   "main": "index.js",

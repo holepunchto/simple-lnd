@@ -3,7 +3,7 @@
 Simple HTTP api client for LND
 
 ```
-npm install simple-lnd
+npm install @holepunchto/simple-lnd
 ```
 
 ## Usage
