@@ -14,4 +14,4 @@ const simple-lnd = require('simple-lnd')
 
 ## License
 
-MIT
+Apache-2.0
